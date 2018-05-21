@@ -12,34 +12,43 @@ import java.util.Properties;
 
 public class Pivot {
 
+    private static String jdbcUrl,
+            jdbcUser,
+            jdbcPassword,
+            columnQuery,
+            mvName,
+            columnPrefix,
+            pivotQuery;
+    private static Connection connection;
+
     public static void main(String[] args)
     {
         try {
-        File configFile = new File("./" + args[0]);
-        FileInputStream fis = new FileInputStream(configFile);
-        Properties props = new Properties();
-        props.load(fis);
-        String jdbcUrl = props.getProperty("jdbcUrl"),
-               jdbcUser = props.getProperty("jdbcUser"),
-               jdbcPassword = props.getProperty("jdbcPassword"),
-               columnQuery = props.getProperty("columnQuery"),
-               mvName = props.getProperty("mvName"),
-               columnPrefix = props.getProperty("columnPrefix"),
-               pivotQuery = props.getProperty("pivotQuery");
-        Class.forName("oracle.jdbc.driver.OracleDriver");
-        Connection connection = DriverManager.getConnection(jdbcUrl,jdbcUser,jdbcPassword);
-        PreparedStatement getColumns = connection.prepareStatement(columnQuery);
-        ArrayList<String> columns = new ArrayList<>();
-        ResultSet columnsRS = getColumns.executeQuery();
-        while (columnsRS.next()) {
-            columns.add(columnsRS.getString(1));
-        }
-        iterateAndPivot(columns,columnPrefix,pivotQuery,mvName,connection);
-        columns = null;
-        columnsRS = null;
+            File configFile = new File("./" + args[0]);
+            FileInputStream fis = new FileInputStream(configFile);
+            Properties props = new Properties();
+            props.load(fis);
+            jdbcUrl = props.getProperty("jdbcUrl");
+            jdbcUser = props.getProperty("jdbcUser").toUpperCase();
+            jdbcPassword = props.getProperty("jdbcPassword");
+            columnQuery = props.getProperty("columnQuery");
+            mvName = props.getProperty("mvName").toUpperCase();
+            columnPrefix = props.getProperty("columnPrefix");
+            pivotQuery = props.getProperty("pivotQuery");
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            connection = DriverManager.getConnection(jdbcUrl,jdbcUser,jdbcPassword);
+            PreparedStatement getColumns = connection.prepareStatement(columnQuery);
+            ArrayList<String> columns = new ArrayList<>();
+            ResultSet columnsRS = getColumns.executeQuery();
+            while (columnsRS.next()) {
+                columns.add(columnsRS.getString(1));
+            }
+            iterateAndPivot(columns);
+            columns = null;
+            columnsRS = null;
 
-        connection.close();
-        connection = null;
+            connection.close();
+            connection = null;
     }
     catch (Exception e) {
         e.printStackTrace();
@@ -49,15 +58,11 @@ public class Pivot {
     /**
      *
      * @param columns Columns we're going to pivot
-     * @param columnPrefix Prefix in front of the column EX: MYPREFIX_ATTRIBUTE1
-     * @param pivotQuery Pivot you want to perform minus the IN statement (see example properties)
-     * @param mvName Materalized view(s) that will be the output of the pivot
-     * @param connection DB Connection
      * @apiNote This could have been done in the main class but I changed how this code works before I realized that and I'm far too lazy to change things now.
      */
-    private static void iterateAndPivot(ArrayList<String> columns,String columnPrefix,String pivotQuery, String mvName, Connection connection)
+    private static void iterateAndPivot(ArrayList<String> columns)
     {
-        System.out.println("Processing " + mvName + " with " + columns.size() + " columns");
+        System.out.println("Processing " + mvName + " with " + columns.size() + " columns\n");
         try {
             int mvNumber = 1;
             String inColString = "";
@@ -68,23 +73,37 @@ public class Pivot {
                 if (counter < 950) {
                     inColString = inColString + ", '" + curColumn + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
                 } else {
-                    String pivot = pivotQuery + StringUtils.substring(inColString, 2, inColString.length()) + "))";
-                    String mvCreate = "CREATE MATERIALIZED VIEW " + mvName + "_" + String.valueOf(mvNumber) + " NOLOGGING CACHE BUILD IMMEDIATE AS " + pivot;
-                    connection.createStatement().executeUpdate(mvCreate);
-                    System.out.println("Creating " + mvName + "_" + mvNumber);
+                    createMv(inColString,mvNumber);
                     mvNumber++;
                     counter = 0;
                     inColString = ", '" + curColumn + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
-
                 }
             }
             if ((mvNumber > 1 && columns.size() % 950 != 0) || columns.size() < 950) {
-                String pivot = pivotQuery + StringUtils.substring(inColString, 2, inColString.length()) + "))";
-                String mvCreate = "CREATE MATERIALIZED VIEW " + mvName + "_" + String.valueOf(mvNumber) + " NOLOGGING CACHE BUILD IMMEDIATE AS " + pivot;
-                connection.createStatement().executeUpdate(mvCreate);
-                System.out.println("Creating " + mvName + "_" + mvNumber);
-
+                createMv(inColString,mvNumber);
             }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    private static void createMv(String inColString,int mvNumber)
+    {
+        try {
+            String pivot = pivotQuery + StringUtils.substring(inColString, 2, inColString.length()) + "))";
+            String mvNameNumber = mvName + "_" + String.valueOf(mvNumber);
+            String mvCreate = "CREATE MATERIALIZED VIEW " + mvNameNumber + " NOLOGGING CACHE BUILD IMMEDIATE AS " + pivot;
+            String checkForView = "SELECT COUNT(*) FROM ALL_MVIEWS WHERE MVIEW_NAME='" + mvNameNumber + "' AND OWNER='" +jdbcUser + "'";
+            ResultSet res =  connection.prepareStatement(checkForView).executeQuery();
+            res.next();
+            int doesExist = res.getInt(1);
+            if (doesExist >= 1) {
+                String removeView = "DROP MATERIALIZED VIEW " + mvNameNumber;
+                System.out.println(mvNameNumber + " already exists. DROPPING.");
+                connection.createStatement().executeUpdate(removeView);
+            }
+            connection.createStatement().executeUpdate(mvCreate);
+            System.out.println("Creating " + mvName + "_" + mvNumber + "\n");
         }
         catch (Exception e) {
             e.printStackTrace();
