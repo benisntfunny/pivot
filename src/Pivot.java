@@ -69,14 +69,14 @@ public class Pivot {
             int counter = 0;
             for (int i = 0; i < columns.size(); i++) {
                 counter++;
-                String curColumn = columns.get(i).replaceAll("/[^A-Za-z0-9]/", "").replaceAll(" ", "_");
+                String curColumn = columns.get(i).replaceAll("/[^A-Za-z0-9]/", "").replaceAll(" ", "_").replaceAll("-","_");
                 if (counter < 950) {
-                    inColString = inColString + ", '" + curColumn + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
+                    inColString = inColString + ", '" + columns.get(i) + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
                 } else {
                     createMv(inColString,mvNumber);
                     mvNumber++;
                     counter = 0;
-                    inColString = ", '" + curColumn + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
+                    inColString = ", '" + columns.get(i) + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
                 }
             }
             if ((mvNumber > 1 && columns.size() % 950 != 0) || columns.size() < 950) {
@@ -102,6 +102,7 @@ public class Pivot {
                 System.out.println(mvNameNumber + " already exists. DROPPING.");
                 connection.createStatement().executeUpdate(removeView);
             }
+            System.out.println(mvCreate);
             connection.createStatement().executeUpdate(mvCreate);
             System.out.println("Creating " + mvName + "_" + mvNumber + "\n");
         }
