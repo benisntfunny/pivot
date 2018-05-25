@@ -69,7 +69,7 @@ public class Pivot {
             int counter = 0;
             for (int i = 0; i < columns.size(); i++) {
                 counter++;
-                String curColumn = columns.get(i).replaceAll("/[^A-Za-z0-9]/", "").replaceAll(" ", "_").replaceAll("-","_");
+                String curColumn = columns.get(i).replaceAll("/[^A-Za-z0-9]/", "").replaceAll(" - ","").replaceAll("/","").replaceAll(" ", "_").replaceAll("-","_");
                 if (counter < 950) {
                     inColString = inColString + ", '" + columns.get(i) + "' " + columnPrefix + StringUtils.substring(curColumn, 0, 30 - columnPrefix.length()) + "";
                 } else {
