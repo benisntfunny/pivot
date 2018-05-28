@@ -27,7 +27,7 @@ pivotQuery = SELECT * FROM ( SELECT CUSTOMERKEY, ITEM_CD FROM TXN WHERE ORDER_ST
 # One or more materialized views that will house the pivot data
 mvName = MV_TXN_SHIP_ITEM
 
-# Prefix for the columns in the table. Max columns name length is 30 and names longer than 30 with prefix will be cropped.
-columnPrefix = S_ITEM_
 
+# Code Table where column names will be stored
+codeTableName=CODE_TXN_SHIP_ITEM
 ```
